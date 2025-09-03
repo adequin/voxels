@@ -1,49 +1,6 @@
-% Voxel simplified model stiffness matrix
-% Notes: 
-% solve symmetry issue, probably some rotated beams
-% individual dof constraints
-% convert strain gauge data to force inputs
-% show constrained nodes and strain gauge data in visualizer
-% add 
-
-
-% Validation 2D tests
-% - [o]  test single non rotated beam in 2D
-% - [o]  Test single rotated beam in 2D -> rotations cause small errors on
-% the order of e-16
-% - [o]  test parallel non rotated beam in 2D
-% - [o]  test parallel non rotated beam of different lengths in 2D
-% - [o]  test single pi/4 rotated beam in 2D
-% - [o]  test parallel rotated beam in 2D - if both fixed, doubles
-% stiffness, if one fixed, translations caused by node 1 rotation are seen
-% - [o]  test combined rotated + non rotated beam in 2D
-% - [o]  test serial non rotated beam in 2D
-% - [o]  test serial rotated beam in 2D
-
-%Validation 3D tests
-% - [o]  test single rotated beam in 3D (y-axis): figured out an issue with
-% the rotation matrices, was rotating the wrong way
-% - []  test single doubly rotated beam in 3D (y,z-axis) - ok this actually
-% matters.
-% - [o]  test single non rotated beam with 3D force vector - validated with
-% same relative force applied to doubly rotated beam and then converted displacements 
-% - [o]  test parallel doubly rotated beam in 3D (just validating ratios 
-% between two 45deg beams and single axial beam; should be a factor of 2)
-
-%%% implemented x rotations and fliped rotation orders to be xyz %%%
-% - [o]  test parallel structure with a beam separating them - reorganized
-% force matrix to be like displacement output
-% - [o]  test serial doubly rotated beam in 3D -> rotation order is applied
-% in reverse direction z->y->x global frame
-
-%% debugging lack of symmetry
-% - adding vector display -> all green arrows point in the right direction
-% - find y stiffness values for each face ->
-% - main issue was still rotation order and direction, vector display does
-% not necessarily match stiffness matrix
-
-%% 
+%% Single Voxel Matrix
 % clear; clc;
+function stiffness_matrix = voxel_setup(origin, p)
 b = 1.6e-3;% width in m
 h = 6e-3; % height in m
 
@@ -56,7 +13,6 @@ iz = b*h^3/12; % area moment of inertia about z
 ix = iy+iz;% geometric value, but try the empirical version if results are off
 l = 47.686e-3; %m
 l_45 = l*sqrt(2);
-F_value = 1000; %Define load condition: 1 Newton in y1 direction
 
 %%name nodes%%
 %face 1 (front face)
@@ -175,66 +131,16 @@ beam_config = [
                 m6,r6,-pi/2+offset,0,0,l
     ]; 
 
+
+
 % beam_config1 = [1,2,0,pi/2,pi/2,l];
 % beam_config2 = [1,2,0,0,pi/2,l];
 
 %compute
-K_actual = assemble_stiffness_3D(beam_config, e, g, a, ix, iy, iz);% Define stiffness matrix
+stiffness_matrix = assemble_stiffness_3D(beam_config, e, g, a, ix, iy, iz);% Define stiffness matrix
 
-%Define applied Force
-F_input = zeros(length(K_actual)/6,6); %index using F(node, dofs)
-F_input(t1,1:3) = [0,0,-F_value];
-F_input(t2,1:3) = [0,0,-F_value];
-F_input(t3,1:3) = [0,0,-F_value];
-F_input(t4,1:3) = [0,0,-F_value];
-% F_input(m5,1:3) = [0,-F_value,0];
-
-%Define constraints
-constrained_nodes = [b1,b2,b3,b4];
-
-Displacements = find_displacements(K_actual, F_input, constrained_nodes);
-
-% % -- after you have beam_config and Displacements -----------------
-coords = beamCoords(beam_config);
-plotBeamDeform(beam_config, coords, Displacements, 20);  % scale=50×
-% plotBeamDeform(beam_config, coords, zeros(size(coords,1),6), 1); % no deformation
-% showBeamAxes(beam_config, coords, 0.12); 
-
-%find individual stiffnesses -> K = F/x
-
-
-% reference axial displacement
-d = F_value*l/(e*a);
-
-function x_full = find_displacements(K_actual, F, constrained_nodes)
-    % finds numerical displacement values
-    % Inputs:
-    % k_assembly - 3D Stiffness matrix
-    % loads - Force vector with applied loads
-    % constraints - fixed degrees of freedom
-    % Outputs: 
-    % 6 by n matrix where each column is a node
-    % index using (node, dof)
-    F = reshape(F',[],1);
-    C = [];
-    for node = constrained_nodes
-        C = [C, 6*node-5:6*node]; % x, y, theta DOFs
-    end
-
-    % Define free DOFs (all DOFs minus constrained DOFs)
-    all_dofs = 1:size(K_actual, 1);
-    free_dofs = setdiff(all_dofs, C);
-
-    % Reduce stiffness matrix and force vector
-    K_reduced = K_actual(free_dofs, free_dofs); % Remove constrained rows/columns
-    F_reduced = F(free_dofs); % Remove constrained rows
-    x_reduced = K_reduced \ F_reduced; % Solve for displacements at free DOFs
-    
-    % Reconstruct the full displacement vector
-    x_full = zeros(size(K_actual, 1), 1);
-    x_full(free_dofs) = x_reduced; % Fill in free DOFs (constrained DOFs remain zero)
-    x_full = reshape(x_full, 6, [])';
 end
+
 % 3D General Stiffness Matrix Assembly
 function K_global = assemble_stiffness_3D(beam_data_3D, E, G, A, Ix, Iy, Iz)
     % Inputs:
@@ -364,109 +270,4 @@ function R = rotation_matrix_3D(anglex, angley, anglez)
     % disp('Local axes in global frame:');
     % disp([e1, e2, e3]);
 end
-
-% Display beam_config
-function nodeCoords = beamCoords(beam_config)
-% Returns an array  [x y z]  for every node index that appears.
-%
-% beam_config cols: [node1 node2 anglex angley anglez L]
-
-    ex = [1;0;0];                           % local x unit
-    maxNode = max( beam_config(:,1:2) ,[],'all');
-    nodeCoords = nan(maxNode,3);            % pre‑fill NaNs
-    nodeCoords(1,:) = [0 0 0];              % start at origin
-
-    unresolved = true;
-    while unresolved
-        unresolved = false;
-        for i = 1:size(beam_config,1)
-            n1 = beam_config(i,1);      n2 = beam_config(i,2);
-            ax = beam_config(i,3);      ay = beam_config(i,4);
-            az = beam_config(i,5);      L  = beam_config(i,6);
-
-            % rotation matrix (intrinsic X‑Y‑Z, matches your code)
-            Rx = [1 0 0; 0 cos(ax) -sin(ax); 0 sin(ax) cos(ax)];
-            Ry = [cos(ay) 0 sin(ay); 0 1 0; -sin(ay) 0 cos(ay)];
-            Rz = [cos(az) -sin(az) 0; sin(az) cos(az) 0; 0 0 1];
-            R  = Rx*Ry*Rz;
-            vec = (R*ex*L).';           % 1×3
-
-            if  ~isnan(nodeCoords(n1,1)) && isnan(nodeCoords(n2,1))
-                nodeCoords(n2,:) = nodeCoords(n1,:) + vec;
-                unresolved = true;
-            elseif ~isnan(nodeCoords(n2,1)) && isnan(nodeCoords(n1,1))
-                nodeCoords(n1,:) = nodeCoords(n2,:) - vec;
-                unresolved = true;
-            end
-        end
-    end
-end
-
-function plotBeamDeform(beam_config, nodeCoords, U, scale)
-% Plots undeformed (gray) and deformed (blue) beams.
-% U : N×6 displacement matrix, translational DOFs in columns 1..3
-
-    if nargin < 4, scale = 1; end
-    U = U(:,1:3) * scale;          % use only translations
-
-    figure; hold on; grid on; axis equal
-    view(3);                       % 3‑D view
-    xlabel('X'); ylabel('Y'); zlabel('Z');
-    title('Undeformed (gray) and deformed (blue)');
-
-    for i = 1:size(beam_config,1)
-        n1 = beam_config(i,1); n2 = beam_config(i,2);
-
-        P1 = nodeCoords(n1,:);   P2 = nodeCoords(n2,:);
-        % undeformed
-        plot3([P1(1) P2(1)], [P1(2) P2(2)], [P1(3) P2(3)], 'k-', ...
-              'Color',[0.6 0.6 0.6],'LineWidth',1);
-
-        % deformed
-        P1d = P1 + U(n1,:);  P2d = P2 + U(n2,:);
-        plot3([P1d(1) P2d(1)], [P1d(2) P2d(2)], [P1d(3) P2d(3)], ...
-              'b-','LineWidth',1.5);
-    end
-
-    % node labels
-    for n = 1:size(nodeCoords,1)
-        p = nodeCoords(n,:);
-        text(p(1),p(2),p(3),sprintf(' %d',n), 'FontSize',8);
-    end
-end
-
-function showBeamAxes(beam_config, nodeCoords, scale)
-% Draws a short green arrow = local +Y
-%        and a short red   arrow = local +Z
-% at the mid‑point of every beam.
-% scale : arrow length (default = 10 % of beam length)
-
-    if nargin<3, scale = 0.10; end
-    hold on
-    for i = 1:size(beam_config,1)
-        n1 = beam_config(i,1);   n2 = beam_config(i,2);
-        ax = beam_config(i,3);   ay = beam_config(i,4);   az = beam_config(i,5);
-        L  = beam_config(i,6);
-
-        P1 = nodeCoords(n1,:);   P2 = nodeCoords(n2,:);
-        P0 = (P1+P2)/2;                       % mid‑point
-
-        % build the same rotation used in your stiffness
-        Rx = [1 0 0; 0 cos(ax) -sin(ax); 0 sin(ax) cos(ax)];
-        Ry = [cos(ay) 0 sin(ay); 0 1 0; -sin(ay) 0 cos(ay)];
-        Rz = [cos(az) -sin(az) 0; sin(az) cos(az) 0; 0 0 1];
-        R  = Rx*Ry*Rz;                        % extrinsic X‑Y‑Z
-
-        ey = R*[0;1;0];                       % local +y
-        ez = R*[0;0;1];                       % local +z
-
-        aLen = scale*L;
-        quiver3(P0(1),P0(2),P0(3), ey(1),ey(2),ey(3), aLen,...
-                'Color',[0 0.7 0],'LineWidth',1,'MaxHeadSize',0.5);
-        quiver3(P0(1),P0(2),P0(3), ez(1),ez(2),ez(3), aLen,...
-                'Color',[0.8 0 0],'LineWidth',1,'MaxHeadSize',0.5);
-    end
-    legend({'undeformed','deformed','local +Y','local +Z'},'Location','best');
-end
-
 
