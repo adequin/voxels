@@ -15,89 +15,35 @@
 % - create a voxel using id
 % - create connectors using map
 
-clear;clc;
+
 
 %%test code
 % something like this
-% layer 1:
-A =         [1,0;
-            1,0 ];
-A(:,:,2) =  [0,0;
-            1,1];
+% clear;clc;
+% A =         [1,0;
+%             1,0 ];
+% A(:,:,2) =  [0,0;
+%             1,1];
 
 % vox_arr = init_arr(A);
 
-% % get_nodes()
+% % define_nodes(A,1,1,1)
 % conn = get_conn_map(A);
 % conn.x, conn.z
-% get_voxel_config(get_nodes(), 2);
-arr = config_array(A);
-size(arr)
+% get_voxel_config(define_nodes(A,1,1,1), 2);
+% arr = get_array_config(A);
+% size(arr)
 
 
-function array_config = config_array(A)
+function array_config = get_array_config(A)
     id_arr = init_arr(A);
-    nodes = get_nodes;
+    nodes = define_nodes(A,1,1,1);
     conn_map = get_conn_map(A);
     array_config = get_connector_edges(conn_map, id_arr, nodes);
     for i = 1:nnz(A)
         array_config = [array_config; get_voxel_config(nodes, i)];
     end
 
-end
-
-function id_arr = init_arr(A)
-    %creates struct with voxel ids
-    %A is a logical matrix indicating voxel positions
-    A = logical(A);
-    id_arr = zeros(size(A),'double'); % 
-    id_arr(A) = double(1:nnz(A)); % replace true entries with sequential values. nnz-> number of non zero values
-end
-
-function nodes = get_nodes()
-    %id is a struct containing the node names
-
-    %face 1 (front face)
-    nodes.b1 = 1; %bottom
-    nodes.cl1 = 2; %corner left
-    nodes.m1 = 3; %middle
-    nodes.cr1 = 4; %corner right
-    nodes.t1 = 5; %top
-
-    %face 2 (right face)
-    nodes.b2 = 6; %bottom
-    nodes.cf2 = nodes.cr1; %corner front
-    nodes.m2 = 7; %middle
-    nodes.cb2 = 8; %corner back
-    nodes.t2 = 9; %top
-
-    %face 3 (back face)
-    nodes.b3 = 10; %bottom
-    nodes.cl3 = 11; %corner left (viewed from the front)
-    nodes.m3 = 12; %middle
-    nodes.cr3 = nodes.cb2; %corner right
-    nodes.t3 = 13; %top
-
-    %face 4 (left face)
-    nodes.b4 = 14; %bottom
-    nodes.cf4 = nodes.cl1; %corner front
-    nodes.m4 = 15; %middle
-    nodes.cb4 = nodes.cl3; %corner back
-    nodes.t4 = 16; %top
-
-    %face 5 (top face)
-    nodes.f5 = nodes.t1; %front
-    nodes.l5 = nodes.t4; %left
-    nodes.m5 = 17; %middle
-    nodes.r5 = nodes.t2; %right
-    nodes.bk5 = nodes.t3; %back
-
-    %face 6 (bottom face)
-    nodes.f6 = nodes.b1; %front
-    nodes.l6 = nodes.b4; %left
-    nodes.m6 = 18; %middle
-    nodes.r6 = nodes.b2; %right
-    nodes.bk6 = nodes.b3; %back
 end
 
 function conn_map = get_conn_map(A)
@@ -187,7 +133,7 @@ function voxel_config = get_voxel_config(nodes, vox_id)
     %DEFINE PARAMETERS
     b = 1.6e-3;% width in m
     h = 6e-3; % height in m
-    
+    % b = h
     e = 25e9; %youngs modulus (25-30 GPA)in Pa
     g = 10e9; %shear modulus estimate in Pa
     l = 47.686e-3; %m
@@ -328,9 +274,9 @@ function conn_config = find_conn_nodes_z(nodes, r,c,s, id_arr)
                 new_id1(nodes.b3),new_id2(nodes.t3);
                 new_id1(nodes.b4),new_id2(nodes.t4)];
 
-    rotations = [0,pi/2,0;
+    rotations = [0,-pi/2,0;
                  -pi/2,0,pi/2;
-                 0,pi/2,0;
+                 0,-pi/2,0;
                  -pi/2,0,pi/2];
     conn_config = [id_pairs, rotations];
 end
@@ -364,6 +310,7 @@ function conn_config = get_connector_edges(conn_map, id_arr, nodes)
     %connector parameters:
     b = 1.6e-3;% width in m
     h = 6e-3; % height in m
+
     e = 25e9; % youngs modulus (25-30 GPA)in Pa
     g = 10e9; %shear modulus estimate in Pa
     l = 3e-3; % length of connector in m
