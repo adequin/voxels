@@ -20,12 +20,12 @@
 %%test code
 % something like this
 % clear;clc;
-% A =         [1,0;
-%             1,0 ];
-% A(:,:,2) =  [0,0;
-%             1,1];
+A =         [1,0;
+            1,1 ];
+A(:,:,2) =  [0,0;
+            1,1];
 
-% vox_arr = init_arr(A);
+% vox_arr = get_lattice(A);
 
 % % define_nodes(A,1,1,1)
 % conn = get_conn_map(A);
@@ -34,19 +34,27 @@
 % arr = get_array_config(A);
 % size(arr)
 
+%new test code
+lat = get_lattice(A);
+n = define_nodes(lat.id(1,1,1));
+c = get_voxel_config(n);
+size(c)
+conn = get_conn_map(lat);
+conn_config = get_connector_edges(lat)
+array_config = config_arr(A)
 
-function array_config = get_array_config(A)
-    id_arr = init_arr(A);
-    nodes = define_nodes(A,1,1,1);
-    conn_map = get_conn_map(A);
-    array_config = get_connector_edges(conn_map, id_arr, nodes);
+function array_config = config_arr(A) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%   <----------------------
+    lat = get_lattice(A);
+    array_config = get_connector_edges(lat);
     for i = 1:nnz(A)
-        array_config = [array_config; get_voxel_config(nodes, i)];
+        nodes = define_nodes(i);
+        array_config = [array_config; get_voxel_config(nodes)]; %we can just use i because spacial relations are determined by connectors
     end
 
 end
 
-function conn_map = get_conn_map(A)
+function conn_map = get_conn_map(lat)
+    A = lat.A;
     % z connectors (rows)
     [Rows,Cols,Slices] = size(A);
     mask = false(size(A));
@@ -74,249 +82,241 @@ function conn_map = get_conn_map(A)
         M3 = (A3>0) & (B3>0);
         conn_map.y(:,:,1:Slices-1) = M3;
     end
+    assert(isequal(size(conn_map.x),lat.dims)) 
+    assert(isequal(size(conn_map.y),lat.dims))
+    assert(isequal(size(conn_map.z),lat.dims))
 end
 
-function offset = get_offset(nodes, vox_id)
-    all_vals = struct2array(nodes);         % dump all field values into one array
-    nodes_per_vox = max(all_vals);  % assumes values are given sequentially
-    offset = (vox_id - 1)*nodes_per_vox;% create offset
-end
-
-function voxel_config = get_voxel_config(nodes, vox_id)
-    %id: voxel number
-    %vox_id: sequential number assigned to vox in array (indexed by grid coords)
-    id_off = get_offset(nodes, vox_id);% create offset
-
-    %OFFSET NODES
-    %face 1
-    b1 = id_off+nodes.b1; %bottom
-    cl1 = id_off+nodes.cl1; %corner left
-    m1 = id_off+nodes.m1; %middle
-    cr1 = id_off+nodes.cr1; %corner right
-    t1 = id_off+nodes.t1; %top
-
-    %face 2 (right face)
-    b2 = id_off+nodes.b2; %bottom
-    cf2 = cr1; %corner front
-    m2 = id_off+nodes.m2; %middle
-    cb2 = id_off+nodes.cb2; %corner back
-    t2 = id_off+nodes.t2; %top
-
-    %face 3 (back face)
-    b3 = id_off+nodes.b3; %bottom
-    cl3 = id_off+nodes.cl3; %corner left (viewed from the front)
-    m3 = id_off+nodes.m3; %middle
-    cr3 = cb2; %corner right
-    t3 = id_off+nodes.t3; %top
-
-    %face 4 (left face)
-    b4 = id_off+nodes.b4; %bottom
-    cf4 = cl1; %corner front
-    m4 = id_off+nodes.m4; %middle
-    cb4 = cl3; %corner back
-    t4 = id_off+nodes.t4; %top
-
-    %face 5 (top face)
-    f5 = t1; %front
-    l5 = t4; %left
-    m5 = id_off+nodes.m5; %middle
-    r5 = t2; %right
-    bk5 = t3; %back
-
-    %face 6 (bottom face)
-    f6 = b1; %front
-    l6 = b4; %left
-    m6 = id_off+nodes.m6; %middle
-    r6 = b2; %right
-    bk6 = b3; %back
-
+function voxel_config = get_voxel_config(n)
+    %nodes: voxel node struct
+    
     %DEFINE PARAMETERS
-    b = 1.6e-3;% width in m
-    h = 6e-3; % height in m
-    % b = h
+    b = 6e-3;% width in m
+    h = 1.6e-3; % height in m
+    b_stub = 8.556e-3;
     e = 25e9; %youngs modulus (25-30 GPA)in Pa
     g = 10e9; %shear modulus estimate in Pa
-    l = 47.686e-3; %m
-    l_45 = l*sqrt(2);
-    offset = pi/2;
 
-    %CONSTRUCT VOX CONFIG: [node1, node2, x_rot, y_rot, z_rot, length, young's mod, width, height]
-    voxel_config  = [
-    %face1
-                b1,cl1,offset,0,3*pi/4, l_45, e, g, b, h;
-                b1,m1,offset,0,pi/2, l, e, g, b, h;
-                b1,cr1,offset,0,pi/4,l_45, e, g, b, h;
-                cl1,t1,offset,0,pi/4,l_45, e, g, b, h;
-                m1,t1,offset,0,pi/2, l, e, g, b, h;
-                cr1,t1,offset,0,3*pi/4, l_45, e, g, b, h;
-                cl1,m1,offset,0,0, l, e, g, b, h;
-                m1,cr1,offset,0,0, l, e, g, b, h;
-    %face 2
-                cf2,b2,offset,pi/2,-pi/4,l_45, e, g, b, h;
-                cf2,m2,offset,pi/2,0, l, e, g, b, h;
-                cf2,t2,offset,pi/2,pi/4,l_45, e, g, b, h;
 
-                b2,cb2,offset,pi/2,pi/4,l_45, e, g, b, h;
-                m2,cb2,offset,pi/2,0, l, e, g, b, h;
-                t2,cb2,offset,pi/2,-pi/4,l_45, e, g, b, h;
+    % CONSTRUCT VOX CONFIG: [node1, node2, length, young's mod, shear mod, width, height, theta, face_normal, face_right]
+    voxel_config  = [];
+    for face = n.face_names
+        f = n.(face);
+        stub_edges = [
+                     %small edges
+                     f.bl, f.bm;
+                     f.bm, f.br;
+                     f.rb, f.rm;
+                     f.rm, f.rt;
+                     f.tr, f.tm;
+                     f.tm, f.tl;
+                     f.lt, f.lm;
+                     f.lm, f.lb];
+        main_edges = [
+                     %cross edges
+                     f.lm, f.c;
+                     f.c,  f.rm;
+                     f.tm, f.c;
+                     f.c,  f.bm;
+                     
+                     %diag edges
+                     f.br, f.rb;
+                     f.rt, f.tr;
+                     f.tl, f.lt;
+                     f.lb, f.bl;];
+        edges = [stub_edges; main_edges];
 
-                b2,m2,offset,pi/2,pi/2, l, e, g, b, h;
-                m2,t2,offset,pi/2,pi/2, l, e, g, b, h;
-
-   %face 3
-                cl3,b3,offset,0,-pi/4,l_45, e, g, b, h;
-                cl3,m3,offset,0,0,l, e, g, b, h;
-                cl3,t3,offset,0,pi/4,l_45, e, g, b, h;
-
-                b3,cr3,offset,0,pi/4,l_45, e, g, b, h;
-                m3,cr3,offset,0,0,l, e, g, b, h;
-                t3,cr3,offset,0,-pi/4,l_45, e, g, b, h;
-
-                b3,m3,offset,0,pi/2,l, e, g, b, h;
-                m3,t3,offset,0,pi/2,l, e, g, b, h;
-
-   %face 4
-                cf4,b4,offset,pi/2,-pi/4,l_45, e, g, b, h;
-                cf4,m4,offset,pi/2,0,l, e, g, b, h;
-                cf4,t4,offset,pi/2,pi/4,l_45, e, g, b, h;
-
-                b4,cb4,offset,pi/2,pi/4,l_45, e, g, b, h;
-                m4,cb4,offset,pi/2,0,l, e, g, b, h;
-                t4,cb4,offset,pi/2,-pi/4,l_45, e, g, b, h;
-
-                b4,m4,offset,pi/2,pi/2,l, e, g, b, h;
-                m4,t4,offset,pi/2,pi/2,l, e, g, b, h;
-
-   %face 5 (top)
-
-                f5,l5,-pi/2+offset,0,3*pi/4,l_45, e, g, b, h;
-                f5,m5,-pi/2+offset,0,pi/2,l, e, g, b, h;
-                f5,r5,-pi/2+offset,0,pi/4,l_45, e, g, b, h;
-
-                l5,bk5,-pi/2+offset,0,pi/4,l_45, e, g, b, h;
-                m5,bk5,-pi/2+offset,0,pi/2,l, e, g, b, h;
-                r5,bk5,-pi/2+offset,0,3*pi/4,l_45, e, g, b, h;
-
-                l5,m5,-pi/2+offset,0,0,l, e, g, b, h;
-                m5,r5,-pi/2+offset,0,0,l, e, g, b, h;
-
-%face 6 (bottom)
-                f6,l6,-pi/2+offset,0,3*pi/4,l_45, e, g, b, h;
-                f6,m6,-pi/2+offset,0,pi/2,l, e, g, b, h;
-                f6,r6,-pi/2+offset,0,pi/4,l_45, e, g, b, h;
-
-                l6,bk6,-pi/2+offset,0,pi/4,l_45, e, g, b, h;
-                m6,bk6,-pi/2+offset,0,pi/2,l, e, g, b, h;
-                r6,bk6,-pi/2+offset,0,3*pi/4,l_45, e, g, b, h;
-
-                l6,m6,-pi/2+offset,0,0,l, e, g, b, h;
-                m6,r6,-pi/2+offset,0,0,l, e, g, b, h;
-    ]; 
-
+        p = zeros(size(edges,1),14);
+        for i = 1:size(edges,1)
+            n1 = edges(i,1); n2 = edges(i,2);
+            p1 = get_xyz(n1); p2 = get_xyz(n2);     
+            vec = p2-p1;
+            normal = f.normal;
+            up = f.up;
+            [ex, ey, ez] = local_basis(unit(vec), normal, up);
+            p(i,1:9) = [ex, ey, ez];
+            p(i,10) = norm(vec);
+            p(i,11) = e;
+            p(i,12) = g;
+            p(i,13) = b;
+            p(i,14) = h;
+            
+        end
+        for j = 1:size(stub_edges,1) %edits specific to stub parameters
+            p(j,13) = b_stub;
+        end
+        face_config = [edges,p];
+        voxel_config = [voxel_config ; face_config];
+    end
+    
 end
 
-function conn_config = find_conn_nodes_x(nodes, r,c,s, id_arr)
-    %assumes you checked that there was a neighbor in x (cols)
-    % r, c, s
+function conn_config = find_conn_nodes(r,c,s,lat,cfg)
+    %assumes you checked that there was a neighbor in x (cols), y (slices),
+    %or z (rows)
+    % r, c, s are the voxel coordinates
+    % CONSTRUCT CONN CONFIG: [node1, node2, length, young's mod, shear mod, width, height, theta, face_normal]
+
+    %unpack cfg parameters
+    shift = cfg.shift;
+    normal = cfg.normal;
+    up = cfg.up;
+    f1 = cfg.face1;
+    f2 = cfg.face2;
+    P = cfg.pairs; % cell array N×2 of feature names
+    
+    r2 = r + shift(1); c2 = c + shift(2); s2 = s + shift(3);
+
+    id_arr = lat.id;
     vox_id1 = id_arr(r,c,s);
-    vox_id2 = id_arr(r,c+1,s);
-    off1 = get_offset(nodes, vox_id1);
-    off2 = get_offset(nodes, vox_id2);
-    new_id1 = @(node) node + off1;
-    new_id2 = @(node) node + off2;
-    
-    id_pairs = [new_id1(nodes.b2),new_id2(nodes.b4);
-                new_id1(nodes.cf2),new_id2(nodes.cf4);
-                new_id1(nodes.cb2),new_id2(nodes.cb4);
-                new_id1(nodes.t2),new_id2(nodes.t4)];
+    vox_id2 = id_arr(r2,c2,s2);
 
-    rotations = [pi/2,0,0;
-                 0,0,0;
-                 0,0,0;
-                 pi/2,0,0];
+    if any(~[vox_id1,vox_id2]) %bound check
+        error('Expected neighbor but got zero id at (%d,%d,%d) or (%d,%d,%d).', r,c,s,r2,c2,s2);
+    end
 
-    conn_config = [id_pairs, rotations];
+    n1 = define_nodes(vox_id1);
+    n2 = define_nodes(vox_id2);
+
+    rot = zeros(size(P,1),9);  
+    id_pairs = zeros(size(P,1), 2);
+    flip_flag = 1;% cfg starts with bottom connector then rotates ccw, default is upright so we want to flip first
+    for k = 1:size(P,1)
+        id_pairs(k,1) = n1.(f1).(P{k,1});   % e.g., f1.bm
+        id_pairs(k,2) = n2.(f2).(P{k,2});   % e.g., f2.lm
+
+        %get basis vectors
+        axis = normal; %can't use local voxel coords for this, assume they stick out the face
+        [ex, ey, ez] = local_basis(axis, normal, up, flip_flag);
+        rot(k,:) = [ex,ey,ez]; %compute basis vectors
+        flip_flag = ~flip_flag; %rotates every other connector, assumes they are listed consecutively
+    end
+    conn_config = [id_pairs, rot];
 end
 
-function conn_config = find_conn_nodes_y(nodes, r,c,s, id_arr)
-    %assumes you checked that there was a neighbor in y (slices)
-    vox_id1 = id_arr(r,c,s);
-    vox_id2 = id_arr(r,c,s+1);
-    off1 = get_offset(nodes, vox_id1);
-    off2 = get_offset(nodes, vox_id2);
-    new_id1 = @(node) node + off1;
-    new_id2 = @(node) node + off2;
-    
-    id_pairs = [new_id1(nodes.b3),new_id2(nodes.b1);
-                new_id1(nodes.cl3),new_id2(nodes.cl1);
-                new_id1(nodes.cr3),new_id2(nodes.cr1);
-                new_id1(nodes.t3),new_id2(nodes.t1)];
+function conn_config = get_connector_edges(lat)
+    cfg.x = struct( ...
+        'shift', [0 1 0], ...
+        'normal', [1 0 0], ...
+        'up', [0 0 1], ...
+        'face1', "f2", ...
+        'face2', "f4", ...
+        'pairs', { {'bm','bm'; 'rm','lm'; 'tm','tm'; 'lm','rm'} } );
 
-    rotations = [pi/2,pi/2,0;
-                 0,0,pi/2;
-                 0,0,pi/2;
-                 pi/2,pi/2,0];
-    
-    conn_config = [id_pairs, rotations];
-end
+    cfg.y = struct( ...
+        'shift', [0 0 1], ...
+        'normal', [0 1 0], ...
+        'up', [0 0 1], ...
+        'face1', "f3", ...
+        'face2', "f1", ...
+        'pairs', { {'bm','bm'; 'rm','lm'; 'tm','tm'; 'lm','rm'} } );
 
-function conn_config = find_conn_nodes_z(nodes, r,c,s, id_arr)
-    %assumes you checked that there was a neighbor in x (cols)
-    vox_id1 = id_arr(r,c,s);
-    vox_id2 = id_arr(r+1,c,s);
-    off1 = get_offset(nodes, vox_id1);
-    off2 = get_offset(nodes, vox_id2);
-    new_id1 = @(node) node + off1;
-    new_id2 = @(node) node + off2;
-    
-    id_pairs = [new_id1(nodes.b1),new_id2(nodes.t1);
-                new_id1(nodes.b2),new_id2(nodes.t2);
-                new_id1(nodes.b3),new_id2(nodes.t3);
-                new_id1(nodes.b4),new_id2(nodes.t4)];
+    cfg.z = struct( ...
+        'shift', [1 0 0], ...
+        'normal', [0 0 1], ...
+        'up', [0 1 0], ...
+        'face1', "f5", ...
+        'face2', "f6", ...
+        'pairs', { {'bm','tm'; 'rm','lm'; 'tm','bm'; 'lm','rm'} } );
 
-    rotations = [0,-pi/2,0;
-                 -pi/2,0,pi/2;
-                 0,-pi/2,0;
-                 -pi/2,0,pi/2];
-    conn_config = [id_pairs, rotations];
-end
-
-function conn_config = get_connector_edges(conn_map, id_arr, nodes)
-    
     conn_config = [];
+    conn_map = get_conn_map(lat);
+    id_arr = lat.id;
     if any(conn_map.x,'all')
         for id = id_arr(logical(conn_map.x))'
             idx = find(id_arr==id, 1);            % linear index
             [rx,cx,sx] = ind2sub(size(id_arr), idx);
-            conn_config = [conn_config; find_conn_nodes_x(nodes,rx,cx,sx,id_arr)];
+            conn_config = [conn_config; find_conn_nodes(rx,cx,sx,lat,cfg.x)];
         end
     end
-
     if any(conn_map.y,'all')
         for id = id_arr(logical(conn_map.y))'
             idx = find(id_arr==id, 1);            % linear index
             [ry,cy,sy] = ind2sub(size(id_arr), idx);
-            conn_config = [conn_config; find_conn_nodes_y(nodes,ry,cy,sy,id_arr)];
+            conn_config = [conn_config; find_conn_nodes(ry,cy,sy,lat,cfg.y)];
         end
     end
     if any(conn_map.z,'all')
         for id = id_arr(logical(conn_map.z))'
             idx = find(id_arr==id, 1);            % linear index
             [rz,cz,sz] = ind2sub(size(id_arr), idx);
-            conn_config = [conn_config; find_conn_nodes_z(nodes,rz,cz,sz,id_arr)];
+            conn_config = [conn_config; find_conn_nodes(rz,cz,sz,lat,cfg.z)];
         end
     end
     
     %connector parameters:
-    b = 1.6e-3;% width in m
-    h = 6e-3; % height in m
+    b = lat.conn_b;% width in m
+    h = lat.conn_h; % height in m
 
-    e = 25e9; % youngs modulus (25-30 GPA)in Pa
-    g = 10e9; %shear modulus estimate in Pa
-    l = 3e-3; % length of connector in m
+    e = lat.conn_e; % youngs modulus (25-30 GPA)in Pa
+    g = lat.conn_g; %shear modulus estimate in Pa
+    l = lat.conn_l; % length of connector in m
     param = [l, e, g, b, h];
 
     %append parameters
     param_arr = repmat(param, size(conn_config, 1), 1, 1);
     conn_config = [conn_config, param_arr];
+end
+
+function coords = get_xyz(id)
+%returns relative coordinates from voxel center. Assumes you never need
+%global coords
+    id_loc = mod(id-1,42)+1; %shift back to base node coords (need to account for mod(42,42)->0)
+    map = coord_map();
+
+    if id_loc<=36
+        edge  = ceil(id_loc/3);
+        slot  = id_loc - 3*(edge-1);
+        coords = reshape(map.edge_points(edge,slot,:),1,[]);
+
+    elseif id_loc <=42
+        coords = map.face_points(id_loc-36,:);
+    else
+        error('error mapping id = %d',id_loc);
+    end
+
+    assert(isequal(size(coords), [1 3]))
+end
+
+function [ex, ey, ez] = local_basis(axis,normal,up,flip_flag)
+    %returns three basis row vectors to shift general beam stiffness matrix into
+    %beam defined by p1, p2 on face defined by normal and up vectors.
+    %handles connectors parallel to face normal as well.
+    if nargin<5
+        flip_flag = 0;
+    end
+
+    tol = 1e-9;
+    axis = unit(axis);
+
+    if iscolumn(normal), normal = normal.'; end
+    if iscolumn(up),     up     = up.';     end
+    if iscolumn(axis),   axis    = axis.';    end
+
+    ex = axis/norm(axis);
+    test = abs(dot(normal, ex));
+    if test < tol
+        ey = -normal; %normal case
+        ez = unit(cross(ex, ey));
+    elseif abs(test - 1) < tol
+        ez = up; %connector case
+        ey = unit(cross(ez, ex)); %should be equal to right face vector
+    else
+        error("off axis beam. dot product with face normal = %d, " + ...
+            "ex = %d, %d, %d, " + ...
+            "face normal = %d, %d, %d, ", test, ex(1), ex(2), ex(3), ...
+            normal(1), normal(2), normal(3));
+    end
+
+    if flip_flag %rotate by pi/2 axially
+            [ey, ez] = deal(ez, -ey); 
+    end
+    % checks
+    assert(~all([dot(ex,ey), dot(ey,ez), dot(ez,ex)]))
+    assert(norm(ex)==norm(ey)==norm(ez))
+
+end
+
+function v_normalized = unit(v)
+    v_normalized = v/norm(v);
 end
