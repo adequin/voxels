@@ -1,50 +1,23 @@
-%% what the hell am I doing
-% define voxel assembly here:
-% x   o   x
-% x   x   x
-
-%what are all the things to keep track of?
-% attributes
-% - node names
-% - connectors locations
-% - voxel edges
-% 
-% functions
-% - create voxel array ids
-% - find connector map using array
-% - create a voxel using id
-% - create connectors using map
-
-
-
 %%test code
 % something like this
 % clear;clc;
-A =         [1,0;
-            1,1 ];
-A(:,:,2) =  [0,0;
-            1,1];
+% A =         [1,0;
+%             1,1 ];
+% A(:,:,2) =  [0,0;
+%             1,1];
+% 
+% lat = get_lattice(A);
+% n = define_nodes(lat.id(1,1,1));
+% c = get_voxel_config(n);
+% size(c)
+% conn = get_conn_map(lat);
+% conn_config = get_connector_edges(lat)
+% array_config = config_array(lat)
 
-% vox_arr = get_lattice(A);
-
-% % define_nodes(A,1,1,1)
-% conn = get_conn_map(A);
-% conn.x, conn.z
-% get_voxel_config(define_nodes(A,1,1,1), 2);
-% arr = get_array_config(A);
-% size(arr)
-
-%new test code
-lat = get_lattice(A);
-n = define_nodes(lat.id(1,1,1));
-c = get_voxel_config(n);
-size(c)
-conn = get_conn_map(lat);
-conn_config = get_connector_edges(lat)
-array_config = config_arr(A)
-
-function array_config = config_arr(A) %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%   <----------------------
-    lat = get_lattice(A);
+function array_config = config_array(lat)
+    % takes lattice struct created by get_lattice(A) and generates the config of the array
+    % for each beam: [node1, node2, ex, ey, ez, length, young's mod, shear mod, width, height]
+    A = lat.A;
     array_config = get_connector_edges(lat);
     for i = 1:nnz(A)
         nodes = define_nodes(i);
@@ -98,7 +71,7 @@ function voxel_config = get_voxel_config(n)
     g = 10e9; %shear modulus estimate in Pa
 
 
-    % CONSTRUCT VOX CONFIG: [node1, node2, length, young's mod, shear mod, width, height, theta, face_normal, face_right]
+    % CONSTRUCT VOX CONFIG: [node1, node2, ex, ey, ez, length, young's mod, shear mod, width, height]
     voxel_config  = [];
     for face = n.face_names
         f = n.(face);
@@ -155,7 +128,6 @@ function conn_config = find_conn_nodes(r,c,s,lat,cfg)
     %assumes you checked that there was a neighbor in x (cols), y (slices),
     %or z (rows)
     % r, c, s are the voxel coordinates
-    % CONSTRUCT CONN CONFIG: [node1, node2, length, young's mod, shear mod, width, height, theta, face_normal]
 
     %unpack cfg parameters
     shift = cfg.shift;
@@ -258,25 +230,6 @@ function conn_config = get_connector_edges(lat)
     conn_config = [conn_config, param_arr];
 end
 
-function coords = get_xyz(id)
-%returns relative coordinates from voxel center. Assumes you never need
-%global coords
-    id_loc = mod(id-1,42)+1; %shift back to base node coords (need to account for mod(42,42)->0)
-    map = coord_map();
-
-    if id_loc<=36
-        edge  = ceil(id_loc/3);
-        slot  = id_loc - 3*(edge-1);
-        coords = reshape(map.edge_points(edge,slot,:),1,[]);
-
-    elseif id_loc <=42
-        coords = map.face_points(id_loc-36,:);
-    else
-        error('error mapping id = %d',id_loc);
-    end
-
-    assert(isequal(size(coords), [1 3]))
-end
 
 function [ex, ey, ez] = local_basis(axis,normal,up,flip_flag)
     %returns three basis row vectors to shift general beam stiffness matrix into
@@ -312,8 +265,9 @@ function [ex, ey, ez] = local_basis(axis,normal,up,flip_flag)
             [ey, ez] = deal(ez, -ey); 
     end
     % checks
-    assert(~all([dot(ex,ey), dot(ey,ez), dot(ez,ex)]))
-    assert(norm(ex)==norm(ey)==norm(ez))
+    tol = 1e-9;
+    assert( abs(dot(ex,ey))<tol && abs(dot(ey,ez))<tol && abs(dot(ez,ex))<tol );
+    assert( abs(norm(ex)-1)<tol && abs(norm(ey)-1)<tol && abs(norm(ez)-1)<tol );
 
 end
 

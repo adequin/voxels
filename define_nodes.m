@@ -1,6 +1,40 @@
 %define nodes
 
-function n = define_nodes(vox_id)
+function n = define_nodes(varargin)
+    % inputs: vox_id, or lattice, row,col,slice
+    % output: node struct that contains all nodes per face
+    %         and includes each faces normal, up, and right vectors. To access
+    %         nodes use this table 
+
+    %define UV table
+    % XYZ: X points right, Y points in, and Z points up
+    % FACE NORMAL,    UP,     RIGHT,    NUMBER
+    % -Y              +Z      +X        1    
+    % +X              +Z      +Y        2
+    % +Y              +Z      -X        3
+    % -X              +Z      -Y        4
+    % +Z              +Y      +X        5
+    % -Z              -Y      -X        6
+
+    % then access using n.("f" + NUMBER).(direction from face center + left, middle, or right)
+    % e.g. n.f1.lb -> node on face 1 left bottom relative to the uv table
+
+    narginchk(1,4) % enforce that only 1 or 3 inputs are valid
+    if nargin == 1
+        vox_id = varargin{1};
+        % do your "from id" logic here
+
+        
+    elseif nargin == 4
+        lat = varargin{1};
+        r = varargin{2};
+        c = varargin{3};
+        s = varargin{4};
+        vox_id = lat.id(r,c,s);
+    end
+
+
+        
     %define canonical nodes
     n = struct();
     off = (vox_id-1)*42;
@@ -14,15 +48,6 @@ function n = define_nodes(vox_id)
         n.("fn"+k) = 36 + k + off; %add 6 face nodes at the end
     end
 
-    %define UV table
-    % XYZ: X points right, Y points in, and Z points up
-    % FACE NORMAL,    UP,     RIGHT,    NUMBER
-    % -Y              +Z      +X        1    
-    % +X              +Z      +Y        2
-    % +Y              +Z      -X        3
-    % -X              +Z      -Y        4
-    % +Z              +Y      +X        5
-    % -Z              -Y      -X        6
     n.f1.normal = [0;-1;0];
     n.f2.normal = [1;0;0];
     n.f3.normal = [0;1;0];
@@ -87,6 +112,7 @@ function n = define_nodes(vox_id)
            n.fn6 ]; %all flipped
 
     n.face_names = ["f1", "f2", "f3", "f4", "f5", "f6"];
+    n.face_nodes = face_nodes;
     face_vals = [f1; f2; f3; f4; f5; f6];
     for i = 1:numel(n.face_names)
         fname = char(n.face_names(i));

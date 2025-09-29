@@ -7,7 +7,7 @@ function lat = get_lattice(A,conn_l, conn_b, conn_h, conn_e, conn_g, voxel_size,
     l = 3e-3; % length in m
     b = 20e-3;% width in m
     h = 1.6e-3; % height in m
-    e = 25e9; % youngs modulus (25-30 GPA)in Pa
+    e = 30e9; % youngs modulus (25-30 GPA)in Pa
     g = 10e9; %shear modulus estimate in Pa
 
     %default voxel 
