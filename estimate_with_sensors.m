@@ -1,4 +1,4 @@
-function u = estimate_displacements(K, beam_n1, beam_n2, readings)
+function u = estimate_with_sensors(K, beam_n1, beam_n2, readings)
 % K        : (ndof x ndof) global stiffness
 % beam_n1/2     : (nb x 1) node IDs of gauged vertical members
 % readings    : (nb x 1) measured axial strains on those members (need to calculate or calibrate from resistor readings)
@@ -6,7 +6,6 @@ function u = estimate_displacements(K, beam_n1, beam_n2, readings)
     [u, ~] = solve_with_dirichlet(K, bc_idx, bc_val);
     u = reshape(u, 6, [])';
 end
-
 
 
 function [bc_idx, bc_val, fit] = estimate_topface(beam_n1, beam_n2, readings, weights)

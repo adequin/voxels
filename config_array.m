@@ -230,7 +230,6 @@ function conn_config = get_connector_edges(lat)
     conn_config = [conn_config, param_arr];
 end
 
-
 function [ex, ey, ez] = local_basis(axis,normal,up,flip_flag)
     %returns three basis row vectors to shift general beam stiffness matrix into
     %beam defined by p1, p2 on face defined by normal and up vectors.
