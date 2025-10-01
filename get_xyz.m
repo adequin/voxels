@@ -1,4 +1,4 @@
-function coords = get_xyz(id)
+function coords = get_xyz(id, lat)
 %returns relative coordinates from voxel center. Assumes you never need
 %global coords
     id_loc = mod(id-1,42)+1; %shift back to base node coords (need to account for mod(42,42)->0)
@@ -13,6 +13,13 @@ function coords = get_xyz(id)
         coords = map.face_points(id_loc-36,:);
     else
         error('error mapping id = %d',id_loc);
+    end
+
+    if nargin==2
+        vox_id = floor((id-1)/42)+1;
+        [r,c,s] = find(lat.id==vox_id);
+        offset = (lat.voxel_size + lat.conn_l)*[c-1,s-1,-(r-1)];
+        coords = coords+offset;
     end
 
     % assert(isequal(size(coords), [1 3]))

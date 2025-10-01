@@ -6,12 +6,13 @@
 % A(:,:,2) =  [0,0;
 %             1,1];
 % 
+% A = [1,1,1];
 % lat = get_lattice(A);
 % n = define_nodes(lat.id(1,1,1));
 % c = get_voxel_config(n);
 % size(c)
 % conn = get_conn_map(lat);
-% conn_config = get_connector_edges(lat)
+% conn_config = get_connector_edges(lat);
 % array_config = config_array(lat)
 
 function array_config = config_array(lat)
@@ -66,7 +67,14 @@ function voxel_config = get_voxel_config(n)
     %DEFINE PARAMETERS
     b = 6e-3;% width in m
     h = 1.6e-3; % height in m
-    b_stub = 8.556e-3;
+    % b_stub1 = 8.556e-3;
+    % b_stub1 = 15e-3; 'actual' width
+    b_stub = 23.8e-3; %equivalent b for PAT (probably affects J as well)
+    % test values to iterate
+    % I = h*b_stub1^3/12
+    % I1 = h*b_stub^3/12
+    % I2 = h*b_stub1^3/12 + b_stub1*h*(b_stub1/2)^2
+    
     e = 25e9; %youngs modulus (25-30 GPA)in Pa
     g = 10e9; %shear modulus estimate in Pa
 
@@ -139,16 +147,12 @@ function conn_config = find_conn_nodes(r,c,s,lat,cfg)
     
     r2 = r + shift(1); c2 = c + shift(2); s2 = s + shift(3);
 
-    id_arr = lat.id;
-    vox_id1 = id_arr(r,c,s);
-    vox_id2 = id_arr(r2,c2,s2);
-
-    if any(~[vox_id1,vox_id2]) %bound check
+    if any(~[r,c,s,r2,c2,s2]) %bound check
         error('Expected neighbor but got zero id at (%d,%d,%d) or (%d,%d,%d).', r,c,s,r2,c2,s2);
     end
 
-    n1 = define_nodes(vox_id1);
-    n2 = define_nodes(vox_id2);
+    n1 = define_nodes(lat, r,c,s);
+    n2 = define_nodes(lat,r2,c2,s2);
 
     rot = zeros(size(P,1),9);  
     id_pairs = zeros(size(P,1), 2);
@@ -187,29 +191,32 @@ function conn_config = get_connector_edges(lat)
         'shift', [1 0 0], ...
         'normal', [0 0 1], ...
         'up', [0 1 0], ...
-        'face1', "f5", ...
-        'face2', "f6", ...
-        'pairs', { {'bm','tm'; 'rm','lm'; 'tm','bm'; 'lm','rm'} } );
+        'face1', "f6", ...
+        'face2', "f5", ...
+        'pairs', { {'bm','tm'; 'rm','rm'; 'tm','bm'; 'lm','lm'} } );
 
     conn_config = [];
     conn_map = get_conn_map(lat);
     id_arr = lat.id;
     if any(conn_map.x,'all')
-        for id = id_arr(logical(conn_map.x))'
+        id_x = id_arr(logical(conn_map.x));
+        for id = id_x(:)'
             idx = find(id_arr==id, 1);            % linear index
             [rx,cx,sx] = ind2sub(size(id_arr), idx);
             conn_config = [conn_config; find_conn_nodes(rx,cx,sx,lat,cfg.x)];
         end
     end
     if any(conn_map.y,'all')
-        for id = id_arr(logical(conn_map.y))'
+        id_y = id_arr(logical(conn_map.y));
+        for id = id_y(:)'
             idx = find(id_arr==id, 1);            % linear index
             [ry,cy,sy] = ind2sub(size(id_arr), idx);
             conn_config = [conn_config; find_conn_nodes(ry,cy,sy,lat,cfg.y)];
         end
     end
     if any(conn_map.z,'all')
-        for id = id_arr(logical(conn_map.z))'
+        id_z = id_arr(logical(conn_map.z));
+        for id = id_z(:)'
             idx = find(id_arr==id, 1);            % linear index
             [rz,cz,sz] = ind2sub(size(id_arr), idx);
             conn_config = [conn_config; find_conn_nodes(rz,cz,sz,lat,cfg.z)];

@@ -2,14 +2,16 @@ function [u, reactions] = solve_with_dirichlet(K, bc_idx, bc_val, f)
 % K        : (ndof x ndof) global stiffness
 % bc_idx   : column vector of constrained DOF indices
 % bc_val   : column vector of prescribed displacement values at those DOFs
-% constrained_face        : name of constrained face (e.g. 'f6')
+% f        : forces (ndof x 1)
 %
 % RETURNS
-% u        : full displacement vector (ndof x 1)
+% u        : full displacement vector (nodes x 6)
 % reactions: reaction forces at constrained DOFs (|bc_idx| x 1)
 
     ndof = size(K,1);
     if nargin < 4 || isempty(f), f = zeros(ndof,1); end
+    if ~iscolumn(bc_idx), bc_idx = bc_idx(:); end
+    if ~iscolumn(bc_val), bc_val = bc_val(:); end
 
     % Make index sets
     all = (1:ndof).';
@@ -31,6 +33,7 @@ function [u, reactions] = solve_with_dirichlet(K, bc_idx, bc_val, f)
     u = zeros(ndof,1);
     u(free_idx) = uf;
     u(bc_idx)   = bc_val;
+    u = reshape(u', 6, [])';
 
     % Reactions at constrained DOFs: rc = Kcf*uf + Kcc*uc - fc
     reactions = Kcf * uf + Kcc * bc_val - fc;
