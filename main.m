@@ -8,19 +8,23 @@
 % 4. Sensor placement and interpretation to for bending
 % 5. Optimizing sensor placement to approximate general state feedback...
 
-%% Stiffness Matrix
+%% Generate a bridge assembly and display
 clear;clc;
-A =         [1,1,1
+A =         [1,1,1,1;
+             1,0,0,1
             ];
-A(:,:,2) =  [1,1,1
-            ];
-A = [1;1;1];
+A(:,:,2) =  [1,1,1,1
+            1,0,0,1];
+A = [1];
+A(:,:,2) = 1; 
+% A = [1,1]
 
 lat = get_lattice(A);
 cfg = config_array(lat);
 stiffness_matrix = compute_matrix(cfg);
-n = define_nodes(1);
-n1 = n;
+coords = beamCoords(lat,cfg);
+size(coords)
+plotBeams(cfg, coords);
 
 %% code for compression/tension test
 % use sensor readings to find global node displacements by assuming top
@@ -41,7 +45,7 @@ sensor_beams = [n.f1.c, n.f1.bm
 sensor_readings = -[250e-6, 250e-6, 250e-6];
 u = estimate_with_sensors(lat, stiffness_matrix, sensor_beams(:,1), sensor_beams(:,2), sensor_readings);
 coords = beamCoords(lat,cfg);
-plotBeamDeform(cfg, coords, u, 50, sensor_beams);
+plotBeams(cfg, coords, u, 50, sensor_beams);
 
 %% code for bending test
 clear;clc;
@@ -50,7 +54,7 @@ lat = get_lattice(A);
 cfg = config_array(lat);
 K = compute_matrix(cfg);
 
-z_displ = -1e-2; %move by 3cm
+z_displ = -3e-2; %move by 3cm
 
 %strategy: 
 % middle vox gets pushed down from node tm, c, bm on top face -> imposed
@@ -63,8 +67,8 @@ n2 = define_nodes(2);
 n3 = define_nodes(3);
 bot_nodes = [n1.f6.tm, n1.f6.c, n1.f6.bm, ...
              n3.f6.tm, n3.f6.c, n3.f6.bm];
-bot_nodes = [n1.f6.tr, n1.f6.br, ...
-             n3.f6.tl, n3.f6.bl]; %alternative test.
+% bot_nodes = [n1.f6.tr, n1.f6.br, ...
+%              n3.f6.tl, n3.f6.bl]; %alternative test.
 
 for node = bot_nodes
     bc_idx = [bc_idx, 6*node-5:6*node-3]; %x offset to z offset
@@ -78,56 +82,9 @@ bc_val = [bc_val, z_displ*[1,1,1]];
 u = solve_with_dirichlet(K,bc_idx,bc_val);
 
 coords = beamCoords(lat,cfg);
-plotBeamDeform(cfg, coords, u, 1);
+plotBeams(cfg, coords, u, 1);
 
 %% template code for force BC
-clc;
-% n2 = define_nodes(2);
-
-%Define applied Force
-F_value = 50; %Define load condition: 1 Newton in y1 direction
-F_input = zeros(length(stiffness_matrix)/6,6); %index using F(node, dofs)
-top_nodes = [get_face_nodes(n1,"f5",1),];
-% top_nodes = top_nodes(1:end-1);
-for node = top_nodes
-    F_input(node,1:3) = [0,0,-F_value];
-end
-
-%Define constraints
-constrained_nodes = [get_face_nodes(n1, "f6"),];
-Displacements = find_displacements(stiffness_matrix, F_input, constrained_nodes);
-
-% % -- after you have beam_config and Displacements -----------------
-coords = beamCoords(cfg);
-plotBeamDeform(cfg, coords, Displacements, 50);  % scale=50×
-% plotBeamDeform(cfg, coords, zeros(size(coords,1),6), 1); % no deformation
-% showBeamAxes(cfg, coords, 0.12); 
-
-
-%wrapper function for bending test
-% function u = bending_test(K,C_idx,F)
-% 
-% end
-
-%find displacements from force bc and all dof constraints
-function x_full = find_displacements(K_actual, F, constrained_nodes)
-    % finds numerical displacement values
-    % Inputs:
-    % k_assembly - 3D Stiffness matrix
-    % loads - Force vector with applied loads
-    % constraints - fixed degrees of freedom
-    % Outputs: 
-    % 6 by n matrix where each column is a node
-    % index using (node, dof)
-    F = F.'; F = F(:);
-    C = [];
-    for node = constrained_nodes
-        C = [C, 6*node-5:6*node]; % x, y, theta DOFs
-    end
-    
-    [x_full, ~] = solve_with_dirichlet(K_actual, C, zeros(numel(C),1),F);
-    x_full = reshape(x_full, 6, [])';
-end
 
 function nodeCoords = beamCoords(lat, beam_config)
     max_id = max(beam_config(:,1:2),[],'all');
@@ -136,10 +93,10 @@ function nodeCoords = beamCoords(lat, beam_config)
     nodeCoords = vertcat(out{:});
 end
 
-function plotBeamDeform(beam_config, nodeCoords, U, scale, sensor_id)
+function plotBeams(beam_config, nodeCoords, U, scale, sensor_id)
 % Plots undeformed (gray) and deformed (blue) beams.
 % U : N×6 displacement matrix, translational DOFs in columns 1..3
-
+    if nargin < 3, U = zeros(length(nodeCoords),6); end
     if nargin < 4, scale = 1; end
     if nargin < 5, sensor_id = [];end
     if width(U)~=6,U = reshape(U', 6,[])';end

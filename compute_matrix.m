@@ -1,5 +1,5 @@
 function K_global = compute_matrix(beam_data_3D)
-    % beam_data_3D row: [node1, node2, anglex, angley, anglez, L]
+    % example K_global row: [node1, node2, local axis, local y axis, local z axis, L,E,G,B,H]
 
     % --- global DOF size ---
     num_nodes = max(max(beam_data_3D(:,1:2)));

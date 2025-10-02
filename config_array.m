@@ -1,5 +1,5 @@
 %%test code
-% something like this
+% something like this.
 % clear;clc;
 % A =         [1,0;
 %             1,1 ];

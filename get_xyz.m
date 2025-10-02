@@ -17,8 +17,8 @@ function coords = get_xyz(id, lat)
 
     if nargin==2
         vox_id = floor((id-1)/42)+1;
-        [r,c,s] = find(lat.id==vox_id);
-        offset = (lat.voxel_size + lat.conn_l)*[c-1,s-1,-(r-1)];
+        [r,c,s] = ind2sub(size(lat.id), find(lat.id==vox_id))
+        offset = (lat.voxel_size + lat.conn_l)*[c-1,s-1,-(r-1)]
         coords = coords+offset;
     end
 
