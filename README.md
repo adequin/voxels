@@ -89,6 +89,7 @@ Minimum dependency is MATLAB (no toolboxes assumed).
 ---
 
 ## Quick start
+Take a look at main.m for example code
 
 ```matlab
 % 1) Define a 3-voxel vertical stack (nx1x1 logical array)
