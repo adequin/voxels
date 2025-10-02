@@ -66,8 +66,21 @@ Minimum dependency is MATLAB (no toolboxes assumed).
 
 * **Node ordering**: each voxel contributes 42 node IDs:
 
+  | Name | Meaning      |
+  | ---- | ------       |
+  | c    | face center  |
+  | bl   | bottom-left  | 
+  | bm   | bottom-middle|
+  | br   | bottom-right |
+  | rb   | right-bottom |
+  | rm   | right-middle |
+  | rt   | right-top    |
+    ... and so on for tl, tm, tr, lt,lm,lb
+
   * 12 edges × 3 points each = 36, plus 6 face centers.
   * Node IDs are contiguous per voxel; face helpers return named nodes like `f5.tm`, `f5.c`, etc.
+  * Node can be addressed by specifying face and direction (e.g. nodes.f1.tm for the face pointing in -Y and "tm" for "top middle" the node)
+  
 
 * **DOF ordering (per node)**: `[ux, uy, uz, rx, ry, rz]` → 6 DOF/node.
 
