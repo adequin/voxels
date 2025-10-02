@@ -1,6 +1,6 @@
 # Voxels: A minimal 3D voxel-beam lattice toolkit (MATLAB)
 
-> Lightweight utilities to assemble voxel lattices, generate 3D beam element configurations, build a global stiffness matrix, solve with Dirichlet boundary conditions, and (optionally) infer top‑face displacements from a few strain sensors. This Readme was AI generated.
+> Lightweight utilities to assemble voxel lattices, generate 3D beam element configurations, build a global stiffness matrix, solve with Dirichlet boundary conditions, and (optionally) infer top‑face displacements from a few strain sensors. This README was AI generated.
 
 ---
 
