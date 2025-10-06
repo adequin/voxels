@@ -1,6 +1,18 @@
 %create coordinate map
 
-function map = coord_map()
+function map = coord_map(voxel_size, chamfer)
+    persistent cache_v cache_c cache_map
+    if nargin==0
+        % Back-compat: pull defaults once
+        lat = get_lattice(1);
+        voxel_size = lat.voxel_size;
+        chamfer    = lat.chamfer;
+    end
+    
+    if ~isempty(cache_map) && cache_v==voxel_size && cache_c==chamfer
+        map = cache_map; return;
+    end
+
     lat = get_lattice(1); %gets template parameters
     s = lat.voxel_size/2; %m
     c = lat.chamfer; %m
@@ -50,6 +62,8 @@ function map = coord_map()
     map.face_points = F;
     map.chamfer = c;
     map.edge_length = s*2;
+
+    cache_v = voxel_size; cache_c = chamfer; cache_map = map;
     
     % figure; hold on; axis equal
     % grid on

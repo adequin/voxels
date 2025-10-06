@@ -1,28 +1,25 @@
-%%test code
-% something like this.
-% clear;clc;
-% A =         [1,0;
-%             1,1 ];
-% A(:,:,2) =  [0,0;
-%             1,1];
-% 
-% A = [1,1,1];
-% lat = get_lattice(A);
-% n = define_nodes(lat.id(1,1,1));
-% c = get_voxel_config(n);
-% size(c)
-% conn = get_conn_map(lat);
-% conn_config = get_connector_edges(lat);
-% array_config = config_array(lat)
-
 function array_config = config_array(lat)
     % takes lattice struct created by get_lattice(A) and generates the config of the array
     % for each beam: [node1, node2, ex, ey, ez, length, young's mod, shear mod, width, height]
-    A = lat.A;
-    array_config = get_connector_edges(lat);
-    for i = 1:nnz(A)
-        nodes = define_nodes(i);
-        array_config = [array_config; get_voxel_config(nodes)]; %we can just use i because spacial relations are determined by connectors
+    if nargin == 0
+        array_config = test();
+    else
+        nb_beams = 96; %number of beams in a voxel
+        A = lat.A;
+        conn_config = get_connector_edges(lat);
+        n = define_nodes(1); % get base nodes
+        base_config = get_voxel_config(n); %calculates parameters
+        p = base_config(:, 3:end); %extract parameters
+        array_config = [conn_config; base_config; zeros(nb_beams*(nnz(A)-1), 16)];
+        offset = size(conn_config,1) + nb_beams; % skip connectors and base voxel
+
+        for i = 2:(nnz(A)) % skip base voxel
+            nodes = define_nodes(i);
+            id_pairs = get_beam_ids(nodes);
+            new_vox_config = [id_pairs, p]; % copy parameters to new id_pairs
+            array_config(offset+(1:nb_beams),:) = new_vox_config; % write voxel into array_config
+            offset = offset + nb_beams; %update index
+        end
     end
 
 end
@@ -56,14 +53,48 @@ function conn_map = get_conn_map(lat)
         M3 = (A3>0) & (B3>0);
         conn_map.y(:,:,1:Slices-1) = M3;
     end
-    assert(isequal(size(conn_map.x),lat.dims)) 
-    assert(isequal(size(conn_map.y),lat.dims))
-    assert(isequal(size(conn_map.z),lat.dims))
+    % assert(isequal(size(conn_map.x),lat.dims)) 
+    % assert(isequal(size(conn_map.y),lat.dims))
+    % assert(isequal(size(conn_map.z),lat.dims))
+end
+
+function id_pairs = get_beam_ids(n)
+    nb_beams = 96; %number of beams in a voxel
+    id_pairs = zeros(nb_beams,2); % all id pairs in a voxel
+    offset = 0;
+    for face = n.face_names
+        f = n.(face);
+        stub_edges = [
+                     %small edges
+                     f.bl, f.bm;
+                     f.bm, f.br;
+                     f.rb, f.rm;
+                     f.rm, f.rt;
+                     f.tr, f.tm;
+                     f.tm, f.tl;
+                     f.lt, f.lm;
+                     f.lm, f.lb];
+        main_edges = [
+                     %cross edges
+                     f.lm, f.c;
+                     f.c,  f.rm;
+                     f.tm, f.c;
+                     f.c,  f.bm;
+                     
+                     %diag edges
+                     f.br, f.rb;
+                     f.rt, f.tr;
+                     f.tl, f.lt;
+                     f.lb, f.bl;];
+        face_edges = [stub_edges; main_edges];
+        nb_face_edges = size(face_edges,1);
+        id_pairs(offset + (1:nb_face_edges),:) = face_edges;
+        offset = offset + nb_face_edges;
+    end
 end
 
 function voxel_config = get_voxel_config(n)
     %nodes: voxel node struct
-    
     %DEFINE PARAMETERS
     b = 6e-3;% width in m
     h = 1.6e-3; % height in m
@@ -77,10 +108,13 @@ function voxel_config = get_voxel_config(n)
     
     e = 25e9; %youngs modulus (25-30 GPA)in Pa
     g = 10e9; %shear modulus estimate in Pa
-
+    face_beams = 16;
+    offset = 0;
 
     % CONSTRUCT VOX CONFIG: [node1, node2, ex, ey, ez, length, young's mod, shear mod, width, height]
-    voxel_config  = [];
+    voxel_config  = zeros(face_beams*6,16);
+    map = coord_map();
+
     for face = n.face_names
         f = n.(face);
         stub_edges = [
@@ -110,7 +144,8 @@ function voxel_config = get_voxel_config(n)
         p = zeros(size(edges,1),14);
         for i = 1:size(edges,1)
             n1 = edges(i,1); n2 = edges(i,2);
-            p1 = get_xyz(n1); p2 = get_xyz(n2);     
+            
+            p1 = get_xyz(n1,[],map); p2 = get_xyz(n2,[],map);     
             vec = p2-p1;
             normal = f.normal;
             up = f.up;
@@ -121,13 +156,12 @@ function voxel_config = get_voxel_config(n)
             p(i,12) = g;
             p(i,13) = b;
             p(i,14) = h;
-            
         end
-        for j = 1:size(stub_edges,1) %edits specific to stub parameters
-            p(j,13) = b_stub;
-        end
+
+        p(1:size(stub_edges,1),13) = b_stub; % edits specific to stub parameters
         face_config = [edges,p];
-        voxel_config = [voxel_config ; face_config];
+        voxel_config(offset+(1:face_beams), :) = face_config; 
+        offset = offset+face_beams; %update index offset
     end
     
 end
@@ -171,7 +205,7 @@ function conn_config = find_conn_nodes(r,c,s,lat,cfg)
 end
 
 function conn_config = get_connector_edges(lat)
-    cfg.x = struct( ...
+    cfgx = struct( ...
         'shift', [0 1 0], ...
         'normal', [1 0 0], ...
         'up', [0 0 1], ...
@@ -179,7 +213,7 @@ function conn_config = get_connector_edges(lat)
         'face2', "f4", ...
         'pairs', { {'bm','bm'; 'rm','lm'; 'tm','tm'; 'lm','rm'} } );
 
-    cfg.y = struct( ...
+    cfgy = struct( ...
         'shift', [0 0 1], ...
         'normal', [0 1 0], ...
         'up', [0 0 1], ...
@@ -187,7 +221,7 @@ function conn_config = get_connector_edges(lat)
         'face2', "f1", ...
         'pairs', { {'bm','bm'; 'rm','lm'; 'tm','tm'; 'lm','rm'} } );
 
-    cfg.z = struct( ...
+    cfgz = struct( ...
         'shift', [1 0 0], ...
         'normal', [0 0 1], ...
         'up', [0 1 0], ...
@@ -195,38 +229,37 @@ function conn_config = get_connector_edges(lat)
         'face2', "f5", ...
         'pairs', { {'bm','tm'; 'rm','rm'; 'tm','bm'; 'lm','lm'} } );
 
-    conn_config = [];
     conn_map = get_conn_map(lat);
+    pairs_per = 4;
+    nX = nnz(conn_map.x); nY = nnz(conn_map.y); nZ = nnz(conn_map.z);
+    total = (nX+nY+nZ)*pairs_per;
+    conn_config = zeros(total, 2+9);
+    idx = 0;
+
     id_arr = lat.id;
-    if any(conn_map.x,'all')
-        id_x = id_arr(logical(conn_map.x));
-        for id = id_x(:)'
-            idx = find(id_arr==id, 1);            % linear index
-            [rx,cx,sx] = ind2sub(size(id_arr), idx);
-            conn_config = [conn_config; find_conn_nodes(rx,cx,sx,lat,cfg.x)];
-        end
+    dims = size(id_arr);
+
+    [rx,cx,sx] = ind2sub(dims, find(conn_map.x));
+    for t = 1:numel(rx) %same number of elements for rx, cx, sx
+        idx = idx(end) + (1:pairs_per);  %update indicies
+        conn_config(idx,:) = find_conn_nodes(rx(t),cx(t),sx(t),lat,cfgx);
     end
-    if any(conn_map.y,'all')
-        id_y = id_arr(logical(conn_map.y));
-        for id = id_y(:)'
-            idx = find(id_arr==id, 1);            % linear index
-            [ry,cy,sy] = ind2sub(size(id_arr), idx);
-            conn_config = [conn_config; find_conn_nodes(ry,cy,sy,lat,cfg.y)];
-        end
+
+    [ry,cy,sy] = ind2sub(dims, find(conn_map.y));
+    for t = 1:numel(ry)
+        idx = idx(end) + (1:pairs_per); %update indicies
+        conn_config(idx,:) = find_conn_nodes(ry(t),cy(t),sy(t),lat,cfgy);
     end
-    if any(conn_map.z,'all')
-        id_z = id_arr(logical(conn_map.z));
-        for id = id_z(:)'
-            idx = find(id_arr==id, 1);            % linear index
-            [rz,cz,sz] = ind2sub(size(id_arr), idx);
-            conn_config = [conn_config; find_conn_nodes(rz,cz,sz,lat,cfg.z)];
-        end
+
+    [rz,cz,sz] = ind2sub(dims, find(conn_map.z));
+    for t = 1:numel(rz)
+        idx = idx(end) + (1:pairs_per);  %update indicies
+        conn_config(idx,:) = find_conn_nodes(rz(t),cz(t),sz(t),lat,cfgz);
     end
     
     %connector parameters:
     b = lat.conn_b;% width in m
     h = lat.conn_h; % height in m
-
     e = lat.conn_e; % youngs modulus (25-30 GPA)in Pa
     g = lat.conn_g; %shear modulus estimate in Pa
     l = lat.conn_l; % length of connector in m
@@ -237,46 +270,22 @@ function conn_config = get_connector_edges(lat)
     conn_config = [conn_config, param_arr];
 end
 
-function [ex, ey, ez] = local_basis(axis,normal,up,flip_flag)
-    %returns three basis row vectors to shift general beam stiffness matrix into
-    %beam defined by p1, p2 on face defined by normal and up vectors.
-    %handles connectors parallel to face normal as well.
-    if nargin<5
-        flip_flag = 0;
-    end
-
-    tol = 1e-9;
-    axis = unit(axis);
-
-    if iscolumn(normal), normal = normal.'; end
-    if iscolumn(up),     up     = up.';     end
-    if iscolumn(axis),   axis    = axis.';    end
-
-    ex = axis/norm(axis);
-    test = abs(dot(normal, ex));
-    if test < tol
-        ey = -normal; %normal case
-        ez = unit(cross(ex, ey));
-    elseif abs(test - 1) < tol
-        ez = up; %connector case
-        ey = unit(cross(ez, ex)); %should be equal to right face vector
-    else
-        error("off axis beam. dot product with face normal = %d, " + ...
-            "ex = %d, %d, %d, " + ...
-            "face normal = %d, %d, %d, ", test, ex(1), ex(2), ex(3), ...
-            normal(1), normal(2), normal(3));
-    end
-
-    if flip_flag %rotate by pi/2 axially
-            [ey, ez] = deal(ez, -ey); 
-    end
-    % checks
-    tol = 1e-9;
-    assert( abs(dot(ex,ey))<tol && abs(dot(ey,ez))<tol && abs(dot(ez,ex))<tol );
-    assert( abs(norm(ex)-1)<tol && abs(norm(ey)-1)<tol && abs(norm(ez)-1)<tol );
-
-end
-
-function v_normalized = unit(v)
-    v_normalized = v/norm(v);
+function c = test
+% put test code
+% something like this.
+% clear;clc;
+% A =         [1,0;
+%             1,1 ];
+% A(:,:,2) =  [0,0;
+%             1,1];
+% 
+A = ones(2,2,2);
+lat = get_lattice(A);
+n = define_nodes(lat.id(1,1,1));
+% c = get_voxel_config(n)
+% c = get_beam_ids(n);
+% size(c)
+% conn = get_conn_map(lat);
+c = get_connector_edges(lat);
+% c = config_array(lat);
 end

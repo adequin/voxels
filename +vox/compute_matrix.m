@@ -34,7 +34,7 @@ function K_global = compute_matrix(beam_data_3D)
         K_local = beam_stiffness_matrix_3D(E, G, A, J, Iy, Iz, L);
 
         % rotation (12x12 from your 3x3)
-        R = [ex', ey', ez'];  R = blkdiag(R, R, R, R); % should be 12x12
+        R = [ex; ey; ez];  R = kron(eye(4),R); % should be 12x12
         K_beam = R * K_local * R.';                    % element in GLOBAL coords
 
         % triplets for this element
